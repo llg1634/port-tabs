@@ -19,7 +19,7 @@ Port Tabs 是一个本地浏览器控制后端。浏览器加载扩展后，扩�
 - 读取浏览器状态：cookies、history、bookmarks、downloads、storage。
 - Network 检索：按 `search/url/domain/method/status/type/failed/hasBody/requestId` 过滤请求，再用 `/network/body` 取响应体。
 
-## 下载发布版安装
+## 下载 Release 安装
 
 从 GitHub Release 下载 `port-tabs-v0.3.2.zip`，解压后得到：
 
