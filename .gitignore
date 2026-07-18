@@ -1,0 +1,5 @@
+out/
+native-host/out/
+publish/dist/
+native-host/com.port_tabs.json
+native-host/native-host.generated.cmd

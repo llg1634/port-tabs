@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Port Tabs",
+  "version": "0.3.2",
+  "description": "Localhost browser control port for the installed Chrome profile.",
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "debugger",
+    "downloads",
+    "history",
+    "bookmarks",
+    "storage",
+    "cookies",
+    "webNavigation"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Port Tabs"
+  }
+}
+
