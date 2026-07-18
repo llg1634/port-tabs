@@ -19,7 +19,37 @@ Port Tabs 是一个本地浏览器控制后端。浏览器加载扩展后，扩�
 - 读取浏览器状态：cookies、history、bookmarks、downloads、storage。
 - Network 检索：按 `search/url/domain/method/status/type/failed/hasBody/requestId` 过滤请求，再用 `/network/body` 取响应体。
 
-## 开发安装
+## 下载发布版安装
+
+从 GitHub Release 下载 `port-tabs-v0.3.2.zip`，解压后得到：
+
+```text
+port-tabs-v0.3.2/
+  extension/      浏览器加载这个目录
+  native-host/    install.ps1 写 Native Messaging manifest、cmd、注册表
+  README.md
+  README.zh-CN.md
+  VERSION.txt
+```
+
+加载扩展：
+
+```text
+chrome://extensions -> 加载已解压的扩展程序 -> port-tabs-v0.3.2/extension/
+```
+
+注册 native host：
+
+```powershell
+cd .\port-tabs-v0.3.2
+.\native-host\install.ps1 -ExtensionId 你的扩展ID -Port 17368 -Browser Chrome
+```
+
+Chrome Stable/Beta/Dev/Canary 都用 `-Browser Chrome`。Edge 用 `-Browser Edge`。
+
+`install.ps1` 在 Release zip 解压后的 `native-host/` 里；源码仓库里的 `native-host/` 用的是开发安装脚本 `install-host.ps1`。
+
+## 从源码运行
 
 ```powershell
 .\native-host\install-host.ps1 -ExtensionId 你的扩展ID -Port 17368
@@ -31,29 +61,15 @@ Port Tabs 是一个本地浏览器控制后端。浏览器加载扩展后，扩�
 chrome://extensions -> 加载已解压的扩展程序 -> extension/
 ```
 
-## 发布版
+## 从源码生成发布版
 
-生成发布目录：
+如果要自己生成 Release 目录：
 
 ```powershell
 .\publish\build-release.ps1
 ```
 
-发布目录只有两部分：
-
-```text
-publish/dist/port-tabs-v版本/
-  extension/      浏览器加载这个目录
-  native-host/    install.ps1 写 Native Messaging manifest、cmd、注册表
-```
-
-发布版安装：
-
-```powershell
-.\native-host\install.ps1 -ExtensionId 你的扩展ID -Port 17368 -Browser Chrome
-```
-
-Chrome Stable/Beta/Dev/Canary 都用 `-Browser Chrome`。Edge 用 `-Browser Edge`。
+生成结果在 `publish/dist/port-tabs-v版本/`，进入这个目录后再运行 `.\native-host\install.ps1 ...`。
 
 ## 自动启动
 

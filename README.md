@@ -27,7 +27,35 @@ curl / Python / Node / desktop app / agent
 - Chrome
 - Node.js available as `node.exe`
 
-## Install
+## Install From Release Zip
+
+Download `port-tabs-v0.3.2.zip` from GitHub Releases and unzip it. The unpacked folder contains:
+
+```text
+port-tabs-v0.3.2/
+  extension/
+  native-host/
+  README.md
+  README.zh-CN.md
+  VERSION.txt
+```
+
+1. Open Chrome and go to `chrome://extensions/`.
+2. Enable `Developer mode`.
+3. Click `Load unpacked`.
+4. Select `port-tabs-v0.3.2/extension`.
+5. Copy the extension ID shown by Chrome.
+6. Run PowerShell from the unpacked `port-tabs-v0.3.2` folder:
+
+```powershell
+.\native-host\install.ps1 -ExtensionId YOUR_EXTENSION_ID -Port 17368 -Browser Chrome
+```
+
+Use `-Browser Chrome` for Chrome Stable/Beta/Dev/Canary. Use `-Browser Edge` for Microsoft Edge.
+
+`install.ps1` exists in the Release zip's `native-host/` folder. In the source repository, use `install-host.ps1` instead.
+
+## Install From Source
 
 1. Open Chrome and go to `chrome://extensions/`.
 2. Enable `Developer mode`.
@@ -42,7 +70,7 @@ curl / Python / Node / desktop app / agent
 
 7. Reload the extension in `chrome://extensions/`.
 
-## Release Packaging
+## Build Release Folder From Source
 
 `publish/` only generates the folder intended for release. It does not add a separate source package or hidden service layer.
 
@@ -356,4 +384,3 @@ Invoke-RestMethod -Method Post http://127.0.0.1:17368/storage `
 ```powershell
 .\native-host\uninstall-host.ps1
 ```
-
