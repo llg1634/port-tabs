@@ -3,17 +3,28 @@ const DEFAULT_CONTROL_PORT = 17368;
 const PORT_STORAGE_KEY = "controlPort";
 const PROFILE_NAME_STORAGE_KEY = "profileName";
 const PROFILE_NOTE_STORAGE_KEY = "profileNote";
+const RISK_MODE_STORAGE_KEY = "automationRiskMode";
+const RISK_LIMIT_STORAGE_KEY = "automationRiskLimit";
+const RISK_TIMESTAMPS_STORAGE_KEY = "automationRiskTimestamps";
+const RISK_WINDOW_MS = 30_000;
+const DEFAULT_RISK_MODE = "soft";
+const DEFAULT_RISK_LIMIT = 5;
 const MAX_EVENTS = 1000;
 
 let nativePort = null;
 let reconnectTimer = null;
 let nextEventId = 1;
+let riskGuardQueue = Promise.resolve();
 
 const attachedDebugTargets = new Set();
 const networkEvents = [];
 const consoleEvents = [];
 const devtoolsEvents = [];
 const requestToTab = new Map();
+const riskCommands = new Map([
+  ["openTab", "new tab"],
+  ["tabs.reload", "tab reload"]
+]);
 
 function normalizePort(value) {
   const port = Number(value);
@@ -21,6 +32,22 @@ function normalizePort(value) {
     throw new Error(`Invalid port: ${value}`);
   }
   return port;
+}
+
+function normalizeRiskMode(value) {
+  const mode = String(value || DEFAULT_RISK_MODE).trim().toLowerCase();
+  if (!["off", "soft", "hard"].includes(mode)) {
+    throw new Error(`Invalid automation risk mode: ${value}`);
+  }
+  return mode;
+}
+
+function normalizeRiskLimit(value) {
+  const limit = Number(value);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+    throw new Error(`Invalid 30-second risk limit: ${value}`);
+  }
+  return limit;
 }
 
 async function getConfiguredPort() {
@@ -32,15 +59,21 @@ async function getProfileConfig() {
   const result = await chrome.storage.local.get({
     [PORT_STORAGE_KEY]: DEFAULT_CONTROL_PORT,
     [PROFILE_NAME_STORAGE_KEY]: "",
-    [PROFILE_NOTE_STORAGE_KEY]: ""
+    [PROFILE_NOTE_STORAGE_KEY]: "",
+    [RISK_MODE_STORAGE_KEY]: DEFAULT_RISK_MODE,
+    [RISK_LIMIT_STORAGE_KEY]: DEFAULT_RISK_LIMIT
   });
   const port = normalizePort(result[PORT_STORAGE_KEY]);
   const profileName = String(result[PROFILE_NAME_STORAGE_KEY] || "").trim();
   const profileNote = String(result[PROFILE_NOTE_STORAGE_KEY] || "").trim();
+  const riskMode = normalizeRiskMode(result[RISK_MODE_STORAGE_KEY]);
+  const riskLimit = normalizeRiskLimit(result[RISK_LIMIT_STORAGE_KEY]);
   return {
     port,
     profileName,
     profileNote,
+    riskMode,
+    riskLimit,
     displayName: profileName || `Browser on ${port}`
   };
 }
@@ -65,12 +98,18 @@ async function setConfiguredPort(port) {
 }
 
 async function setProfileConfig(updates = {}) {
+  const previous = await getProfileConfig();
   const items = {};
   if (updates.port !== undefined) items[PORT_STORAGE_KEY] = normalizePort(updates.port);
   if (updates.profileName !== undefined) items[PROFILE_NAME_STORAGE_KEY] = String(updates.profileName || "").trim();
   if (updates.profileNote !== undefined) items[PROFILE_NOTE_STORAGE_KEY] = String(updates.profileNote || "").trim();
+  if (updates.riskMode !== undefined) items[RISK_MODE_STORAGE_KEY] = normalizeRiskMode(updates.riskMode);
+  if (updates.riskLimit !== undefined) items[RISK_LIMIT_STORAGE_KEY] = normalizeRiskLimit(updates.riskLimit);
   await chrome.storage.local.set(items);
   const config = await getProfileConfig();
+  if (config.riskMode !== previous.riskMode || config.riskLimit !== previous.riskLimit) {
+    await chrome.storage.session.remove(RISK_TIMESTAMPS_STORAGE_KEY);
+  }
   sendProfileConfigure(config);
   return config;
 }
@@ -127,6 +166,101 @@ function withTimeout(promise, timeoutMs, message) {
     timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function serializeRiskGuard(task) {
+  const result = riskGuardQueue.then(task, task);
+  riskGuardQueue = result.catch(() => {});
+  return result;
+}
+
+function riskWarning({ mode, command, action, limit, countBefore, countAfter, blocked, retryAfterMs }) {
+  const warning = {
+    code: "AUTOMATION_RATE_WARNING",
+    severity: blocked ? "error" : "warning",
+    mode,
+    blocked,
+    executed: !blocked,
+    command,
+    action,
+    riskActions: ["new tab", "tab reload"],
+    windowSeconds: RISK_WINDOW_MS / 1000,
+    limit,
+    requestsInWindowBefore: countBefore,
+    requestsInWindowAfter: countAfter,
+    attemptedRequestNumber: countBefore + 1,
+    message: blocked
+      ? `Request blocked: the rolling 30-second limit of ${limit} new-tab/reload requests has been reached. Retry after about ${retryAfterMs} ms or reuse an existing tab. Do not sleep for a fixed 30 seconds.`
+      : `Warning only: this request was executed, but the rolling 30-second limit of ${limit} new-tab/reload requests was exceeded. Reduce burst frequency or reuse an existing tab. Do not automatically sleep for the full 30 seconds.`
+  };
+
+  if (blocked) {
+    warning.retryAfterMs = retryAfterMs;
+  }
+
+  return warning;
+}
+
+async function assessAutomationRisk(command) {
+  const action = riskCommands.get(command);
+  if (!action) {
+    return { blocked: false, warning: null };
+  }
+
+  const config = await getProfileConfig();
+  if (config.riskMode === "off") {
+    return { blocked: false, warning: null };
+  }
+
+  return await serializeRiskGuard(async () => {
+    const now = Date.now();
+    const stored = await chrome.storage.session.get({ [RISK_TIMESTAMPS_STORAGE_KEY]: [] });
+    const storedTimestamps = Array.isArray(stored[RISK_TIMESTAMPS_STORAGE_KEY])
+      ? stored[RISK_TIMESTAMPS_STORAGE_KEY]
+      : [];
+    const timestamps = storedTimestamps
+      .map(Number)
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp <= now && timestamp > now - RISK_WINDOW_MS)
+      .sort((a, b) => a - b);
+    const countBefore = timestamps.length;
+    const overLimit = countBefore >= config.riskLimit;
+
+    if (overLimit && config.riskMode === "hard") {
+      await chrome.storage.session.set({ [RISK_TIMESTAMPS_STORAGE_KEY]: timestamps });
+      const expiryIndex = Math.max(0, countBefore - config.riskLimit);
+      const retryAfterMs = Math.max(0, timestamps[expiryIndex] + RISK_WINDOW_MS - now);
+      const warning = riskWarning({
+        mode: config.riskMode,
+        command,
+        action,
+        limit: config.riskLimit,
+        countBefore,
+        countAfter: countBefore,
+        blocked: true,
+        retryAfterMs
+      });
+      return { blocked: true, warning };
+    }
+
+    timestamps.push(now);
+    await chrome.storage.session.set({ [RISK_TIMESTAMPS_STORAGE_KEY]: timestamps });
+    if (!overLimit) {
+      return { blocked: false, warning: null };
+    }
+
+    return {
+      blocked: false,
+      warning: riskWarning({
+        mode: config.riskMode,
+        command,
+        action,
+        limit: config.riskLimit,
+        countBefore,
+        countAfter: timestamps.length,
+        blocked: false
+      })
+    };
+  });
 }
 
 function tabTarget(tabId) {
@@ -1892,12 +2026,35 @@ async function executeCommand(message) {
   }
 }
 
+async function executeCommandWithRiskGuard(message) {
+  const command = message.command || message.type;
+  const decision = await assessAutomationRisk(command);
+  if (decision.blocked) {
+    return {
+      ok: false,
+      blocked: true,
+      error: decision.warning.message,
+      warning: decision.warning
+    };
+  }
+
+  const data = await executeCommand(message);
+  if (!decision.warning) {
+    return data;
+  }
+
+  return {
+    ...data,
+    warning: decision.warning
+  };
+}
+
 function handleNativeMessage(message) {
   if (!message || !message.id) {
     return;
   }
 
-  executeCommand(message)
+  executeCommandWithRiskGuard(message)
     .then((data) => sendResult(message.id, data))
     .catch((error) => sendError(message.id, error));
 }

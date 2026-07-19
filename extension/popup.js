@@ -1,6 +1,8 @@
 const portInput = document.getElementById("port");
 const profileNameInput = document.getElementById("profileName");
 const profileNoteInput = document.getElementById("profileNote");
+const riskModeInput = document.getElementById("riskMode");
+const riskLimitInput = document.getElementById("riskLimit");
 const saveButton = document.getElementById("save");
 const reconnectButton = document.getElementById("reconnect");
 const statusEl = document.getElementById("status");
@@ -28,6 +30,8 @@ function render(data) {
   portInput.value = data.port;
   profileNameInput.value = data.profileName || "";
   profileNoteInput.value = data.profileNote || "";
+  riskModeInput.value = data.riskMode || "soft";
+  riskLimitInput.value = data.riskLimit || 5;
   urlEl.textContent = `${data.apiBaseUrl}/help`;
   connectionEl.textContent = data.connected
     ? `Native host connected: ${data.displayName || data.profileName || data.port}`
@@ -48,7 +52,9 @@ saveButton.addEventListener("click", async () => {
       type: "setProfile",
       port: Number(portInput.value),
       profileName: profileNameInput.value,
-      profileNote: profileNoteInput.value
+      profileNote: profileNoteInput.value,
+      riskMode: riskModeInput.value,
+      riskLimit: Number(riskLimitInput.value)
     });
     render(result);
     setStatus(`Saved ${result.displayName || result.port} on ${result.apiBaseUrl}`);

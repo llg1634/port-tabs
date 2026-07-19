@@ -8,7 +8,7 @@ Port Tabs 把当前浏览器/profile 变成本机可调用的 HTTP 控制端口�
 
 Port Tabs turns an installed Chrome/Chromium profile into a localhost HTTP control backend. It keeps the real browser state: logged-in accounts, cookies, tabs, windows, history, bookmarks, downloads, page scripts, CDP, Network, Console, screenshots, input debugging, shadow DOM inspection, and event recording.
 
-Current version: `0.3.2`
+Current version: `0.3.4`
 
 It is not an MCP server. Any local program can call `127.0.0.1:17368` with HTTP JSON and control the Chrome profile where the extension is installed. The browser keeps its normal state: logged-in accounts, cookies, windows, tabs, history, bookmarks, and downloads.
 
@@ -21,71 +21,41 @@ curl / Python / Node / desktop app / agent
   -> chrome.tabs / chrome.scripting / chrome.debugger / downloads / history / bookmarks / cookies
 ```
 
+## Security
+
+- The HTTP server binds to `127.0.0.1` only.
+- There is no token, password, caller identity, or authentication layer.
+- Any local process can control tabs, run page JavaScript and CDP commands, and read browser data exposed by the enabled permissions.
+- Screenshot requests with a `path` are written by the native host with the current Windows user's file permissions.
+- Profile names, notes, and ports are labels and routing choices, not security boundaries.
+- Use Port Tabs only on a trusted local machine.
+
 ## Requirements
 
 - Windows
 - Chrome
 - Node.js available as `node.exe`
 
-## Install From Release Zip
+## Install
 
-Download `port-tabs-v0.3.2.zip` from GitHub Releases and unzip it. The unpacked folder contains:
-
-```text
-port-tabs-v0.3.2/
-  extension/
-  native-host/
-  README.md
-  README.zh-CN.md
-  VERSION.txt
-```
+Download the GitHub Source code archive for the selected tag, or clone this repository. The repository itself is the installable package.
 
 1. Open Chrome and go to `chrome://extensions/`.
 2. Enable `Developer mode`.
 3. Click `Load unpacked`.
-4. Select `port-tabs-v0.3.2/extension`.
+4. Select the repository's `extension` folder.
 5. Copy the extension ID shown by Chrome.
-6. Run PowerShell from the unpacked `port-tabs-v0.3.2` folder:
+6. Run PowerShell from the repository root:
 
 ```powershell
-.\native-host\install.ps1 -ExtensionId YOUR_EXTENSION_ID -Port 17368 -Browser Chrome
-```
-
-Use `-Browser Chrome` for Chrome Stable/Beta/Dev/Canary. Use `-Browser Edge` for Microsoft Edge.
-
-`install.ps1` exists in the Release zip's `native-host/` folder. In the source repository, use `install-host.ps1` instead.
-
-## Install From Source
-
-1. Open Chrome and go to `chrome://extensions/`.
-2. Enable `Developer mode`.
-3. Click `Load unpacked`.
-4. Select the `extension` folder in this project.
-5. Copy the extension ID shown by Chrome.
-6. Run PowerShell from this project directory:
-
-```powershell
-.\native-host\install-host.ps1 -ExtensionId YOUR_EXTENSION_ID
+.\native-host\install-host.ps1 -ExtensionId YOUR_EXTENSION_ID -Port 17368
 ```
 
 7. Reload the extension in `chrome://extensions/`.
 
-## Build Release Folder From Source
+The installer writes Chrome's Native Messaging registration for the supplied unpacked extension ID. It also records absolute paths to `node.exe` and `native-host/host.js`; rerun it if the repository moves, the Node.js path changes, or the extension ID changes. The `-Port` value is the launch fallback, while the popup's saved port controls the active HTTP listener after the extension connects.
 
-`publish/` only generates the folder intended for release. It does not add a separate source package or hidden service layer.
-
-```powershell
-.\publish\build-release.ps1
-```
-
-Generated files go to `publish/dist/port-tabs-vVERSION/` and are intentionally only the directly inspectable runtime parts:
-
-```text
-extension/      Browser loads this folder.
-native-host/    install.ps1 writes Native Messaging manifest, launcher cmd, and registry.
-```
-
-The extension is loaded unpacked, and the local host code/scripts are plain files in `native-host/`. See `publish/README.md` for the release workflow. After configuration, the browser starts the native host automatically through Chrome Native Messaging when the extension connects.
+The current installer writes the Google Chrome Native Messaging registry key. It does not accept a `-Browser` parameter or create Edge-specific or Chromium-specific registry keys.
 
 ## Model
 
@@ -112,6 +82,37 @@ Edge               -> 127.0.0.1:17370
 The name/note are also stored per browser/profile. They are only human-readable labels, not sessions, leases, isolation, or authentication. `GET /health`, `GET /schema`, and `GET /help` show the current label so you can tell which browser a port controls.
 
 The native host does not listen until the extension sends its configured port. Changing the port in popup tells the already-running native host to rebind the HTTP server.
+
+## Automation Risk Control
+
+The popup also configures protection for bursts of new-tab and tab-reload requests. These two actions share one per-browser/profile counter.
+
+- `Off`: no warning or blocking.
+- `Soft`: allow the request and attach an `AUTOMATION_RATE_WARNING` after the configured limit is exceeded.
+- `Hard`: do not execute requests above the configured limit; return `ok: false`, `blocked: true`, a warning, and `retryAfterMs`.
+- The window is a rolling 30 seconds. A limit of `5` allows the first five requests; request six warns or blocks.
+- Soft mode never sleeps or delays automatically. It tells the caller to reduce burst frequency or reuse an existing tab.
+- Hard-blocked requests are not added to the counter and do not extend the window.
+- Changing the mode or limit clears the current window. Counters live for the current browser session; saved settings remain per browser/profile.
+
+Soft warning example:
+
+```json
+{
+  "warning": {
+    "code": "AUTOMATION_RATE_WARNING",
+    "mode": "soft",
+    "blocked": false,
+    "executed": true,
+    "windowSeconds": 30,
+    "limit": 5,
+    "requestsInWindowBefore": 5,
+    "requestsInWindowAfter": 6
+  }
+}
+```
+
+Hard blocking currently produces an HTTP error response because the native host maps `ok: false` results to HTTP `500`. The JSON response body still contains the structured warning and the minimum `retryAfterMs`; callers should not replace it with a fixed 30-second sleep.
 
 ## Core API
 

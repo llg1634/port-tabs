@@ -4,7 +4,7 @@ const path = require("path");
 
 const DEFAULT_PORT = Number(process.env.PORT_TABS_PORT || 17368);
 const HOST = "127.0.0.1";
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.3.4";
 const DEFAULT_TIMEOUT_MS = Number(process.env.PORT_TABS_TIMEOUT_MS || 30000);
 const MAX_BODY_BYTES = Number(process.env.PORT_TABS_MAX_BODY_BYTES || 10 * 1024 * 1024);
 

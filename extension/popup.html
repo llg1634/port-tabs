@@ -5,7 +5,7 @@
     <title>Port Tabs</title>
     <style>
       body {
-        width: 280px;
+        width: 320px;
         margin: 0;
         padding: 14px;
         color: #1b1b1b;
@@ -25,6 +25,7 @@
       }
 
       input,
+      select,
       textarea {
         box-sizing: border-box;
         width: 100%;
@@ -69,6 +70,12 @@
         margin-top: 10px;
         min-height: 18px;
       }
+
+      .help {
+        margin-top: 6px;
+        color: #625846;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -80,6 +87,17 @@
     <input id="profileName" type="text" maxlength="80" placeholder="Bilibili debug browser">
     <label for="profileNote">Note</label>
     <textarea id="profileNote" maxlength="500" placeholder="Optional profile/window description"></textarea>
+    <label for="riskMode">Automation risk control</label>
+    <select id="riskMode">
+      <option value="soft">Soft warning (allow request)</option>
+      <option value="hard">Hard limit (block request)</option>
+      <option value="off">Off</option>
+    </select>
+    <label for="riskLimit">Max risky requests in rolling 30 seconds</label>
+    <input id="riskLimit" type="number" min="1" max="1000" step="1" value="5">
+    <div class="help">
+      New-tab and reload requests share this count. A limit of 5 allows the first 5 requests; request 6 warns or blocks. Soft mode only adds a response warning and never sleeps automatically.
+    </div>
     <button id="save">Save</button>
     <button id="reconnect" class="secondary">Reconnect</button>
     <code id="url"></code>
