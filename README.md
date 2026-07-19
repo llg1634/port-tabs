@@ -1,6 +1,6 @@
 # Port Tabs
 
-Port Tabs 把当前浏览器/profile 变成本机可调用的 HTTP 控制端口，终端或本机程序可以通过这个端口操作真实标签页、页面脚本、CDP、Network、Console 和输入调试能力。
+Port Tabs 把当前浏览器/profile 变成本机可调用的 HTTP 控制端口，终端或本机程序可以通过这个端口操作真实标签页、页面脚本、CDP、Network、Console 和输入调试能力。主要用于多 Agent 协作，可替代 MCP Chrome 等其他浏览器控制插件。
 
 [中文说明](README.zh-CN.md)
 
