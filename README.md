@@ -1,4 +1,4 @@
-# Port Tabs
+# 浏览器调试扩展：Agent 通过 HTTP 端口控制 Chrome
 
 搜索关键词：Agent 控制浏览器、Agent 自动化浏览器、多 Agent 浏览器控制、多 Agent 浏览器自动化、浏览器自动化、浏览器自动化工具、浏览器调试扩展、浏览器控制扩展、浏览器调试插件、浏览器控制插件、浏览器 HTTP 控制端口、浏览器控制端口、Chrome 调试扩展、Chrome 控制端口、AI 怎么控制浏览器、怎么用程序控制 Chrome 标签页、怎么通过 HTTP 控制浏览器、本地端口控制浏览器、操作真实标签页、CDP 控制浏览器、执行页面脚本、MCP Chrome 替代、Port Tabs、Port Tabs 扩展。agent controlled browser, agent browser automation, multi-agent browser control, multi-agent browser automation, browser automation, browser automation tool, browser debugging extension, browser control extension, browser debugging plugin, browser control plugin, browser HTTP control port, browser control port, Chrome debugging extension, Chrome control port, how AI controls browser, control Chrome tabs programmatically, control browser over HTTP, control browser via local port, control real tabs, CDP browser control, run page scripts, MCP Chrome alternative, Port Tabs, Port Tabs extension.
 
